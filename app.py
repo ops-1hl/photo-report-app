@@ -2,146 +2,133 @@ import streamlit as st
 import pandas as pd
 from PIL import Image
 from docx import Document
-from docx.shared import Inches, Cm, Pt
-from docx.enum.section import WD_ORIENT
-from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
-from datetime import datetime
+from docx.shared import Cm
+from docx.enum.section import WD_ORIENT, WD_SECTION
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 import tempfile
 import os
-import shutil
-import platform
+from datetime import date
+from docx2pdf import convert
 
-# PDF conversion imports
-try:
-    from docx2pdf import convert as docx2pdf_convert
-    DOCX2PDF_AVAILABLE = True
-except ImportError:
-    DOCX2PDF_AVAILABLE = False
+st.set_page_config(layout="wide")
+st.title("📸 Relatório Oleões - Município de Lisboa")
 
-st.set_page_config(layout="centered")
-st.title("📸 Relatório Fotográfico - Oleões")
+# Upload inputs
+company_logo = st.file_uploader("📤 Upload company logo", type=["png", "jpg", "jpeg"])
+ghg_logo = st.file_uploader("📤 Upload GHG logo", type=["png", "jpg", "jpeg"])
+excel_file = st.file_uploader("📥 Upload Excel file (.xlsx)", type=["xlsx"])
+photos = st.file_uploader("📸 Upload photo files", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
 
-# Uploads
-excel_file = st.file_uploader("📄 Upload Excel (.xlsx)", type=["xlsx"])
-images = st.file_uploader("🖼️ Upload Fotos (.jpg/.png)", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
-company_logo = st.file_uploader("🏢 Logo da Empresa", type=["png", "jpg"])
-ghg_logo = st.file_uploader("♻️ Logo GHG", type=["png", "jpg"])
-
-export_format = st.radio("Formato de Exportação", options=["DOCX", "PDF"])
-
-if excel_file and images and company_logo and ghg_logo:
+if excel_file and photos and company_logo and ghg_logo:
     df = pd.read_excel(excel_file)
-    document = Document()
+    st.write("📋 Detected columns:", df.columns.tolist())
 
-    # Landscape layout
-    section = document.sections[0]
+    doc = Document()
+
+    # Set page layout to A4 landscape
+    section = doc.sections[0]
     section.orientation = WD_ORIENT.LANDSCAPE
-    section.page_width, section.page_height = section.page_height, section.page_width
+    section.page_width = Cm(29.7)
+    section.page_height = Cm(21.0)
+    section.left_margin = Cm(2)
+    section.right_margin = Cm(2)
+    section.top_margin = Cm(2)
+    section.bottom_margin = Cm(2)
 
-    # --- COVER PAGE ---
-    cover_table = document.add_table(rows=1, cols=2)
-    row_cells = cover_table.rows[0].cells
+    # -- COVER PAGE --
+    doc.add_paragraph().add_run().add_break()
 
-    # Company Logo (Left)
+    table = doc.add_table(rows=1, cols=2)
+    row = table.rows[0]
+    cell_logo = row.cells[0]
+    cell_text = row.cells[1]
+
+    # Add logo to left cell
     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_logo:
         tmp_logo.write(company_logo.read())
-        logo_path = tmp_logo.name
-    row_cells[0].paragraphs[0].add_run().add_picture(logo_path, width=Cm(6))
+        cell_logo.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = cell_logo.paragraphs[0].add_run()
+        run.add_picture(tmp_logo.name, width=Cm(6))
 
-    # Title (Right)
-    title_para = row_cells[1].paragraphs[0]
-    title_para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-    title_run = title_para.add_run("Município de Lisboa\nRelatório Final de Instalações\n\nAlargamento Rede de Oleões 2025")
-    title_run.bold = True
-    title_run.font.size = Pt(20)
+    # Add title to right cell
+    title_para = cell_text.paragraphs[0]
+    title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = title_para.add_run("Município de Lisboa\nRelatório Final de Instalações\nAlargamento Rede de Oleões 2025")
+    run.bold = True
+    run.font.size = doc.styles['Normal'].font.size
 
-    # GHG Logo (Bottom right)
-    footer_para = document.add_paragraph()
-    footer_para.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
-    footer_para.add_run("GHG savings certified by:   ")
+    doc.add_paragraph().add_run().add_break()
 
+    # Add GHG logo bottom-right on cover
+    table_ghg = doc.add_table(rows=1, cols=2)
+    row_ghg = table_ghg.rows[0]
+    row_ghg.cells[0].text = "GHG savings certified by:"
+    row_ghg.cells[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_ghg:
         tmp_ghg.write(ghg_logo.read())
-        ghg_path = tmp_ghg.name
-    footer_para.add_run().add_picture(ghg_path, width=Cm(2))
+        row_ghg.cells[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.LEFT
+        row_ghg.cells[1].paragraphs[0].add_run().add_picture(tmp_ghg.name, width=Cm(3.5))
 
-    document.add_page_break()
+    # Add page break after cover
+    doc.add_page_break()
 
-    # --- BODY ---
-    image_map = {os.path.splitext(img.name)[0]: img for img in images}
+    # -- PHOTO MAPPING --
+    photo_map = {os.path.splitext(photo.name)[0]: photo for photo in photos}
 
-    for _, row in df.iterrows():
-        codigo = str(row["ID"])
-        document.add_paragraph().add_run(f"📌 CÓDIGO DO OLEÃO: {codigo}").bold = True
+    # -- CONTENT PAGES --
+    for index, row in df.iterrows():
+        internal = str(row["ID"])  # Make sure this column exists
+        doc.add_paragraph(f"📌 CÓDIGO DO OLEÃO: {internal}", style="Normal")
 
-        if codigo in image_map:
+        if internal in photo_map:
             try:
-                image = Image.open(image_map[codigo]).convert("RGB")
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_img:
-                    image = image.resize((int(Cm(12).pt), int(Cm(16).pt)))
-                    image.save(tmp_img.name, format="JPEG")
-                    document.add_picture(tmp_img.name, width=Cm(12), height=Cm(16))
+                img = Image.open(photo_map[internal]).convert("RGB")  # Ensure RGB
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as img_tmp:
+                    resized = img.resize((int(472.44), int(629.92)))  # ≈ 12cm x 16cm at 96 DPI
+                    resized.save(img_tmp.name, format="JPEG")
+                    doc.add_picture(img_tmp.name, width=Cm(12), height=Cm(16))
             except Exception as e:
-                document.add_paragraph(f"❌ Erro com a imagem: {e}")
+                doc.add_paragraph("⚠️ Error loading image.")
+
         else:
-            document.add_paragraph("❌ Fotografia não encontrada.")
+            doc.add_paragraph("❌ Photo not found.")
 
-        document.add_page_break()
+        doc.add_page_break()
 
-    # --- FINAL PAGE ---
-    final_section = document.add_section(WD_ORIENT.LANDSCAPE)
-    final_section.page_width, final_section.page_height = section.page_width, section.page_height
+    # -- LAST PAGE --
+    doc.add_paragraph().add_run().add_break()
+    table_final = doc.add_table(rows=1, cols=2)
+    final_row = table_final.rows[0]
+    left_cell = final_row.cells[0]
+    right_cell = final_row.cells[1]
 
-    final_table = document.add_table(rows=1, cols=2)
-    final_table.autofit = False
-    final_table.columns[0].width = Cm(12)
-    final_table.columns[1].width = Cm(21)
+    # Company logo centered
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_logo2:
+        tmp_logo2.write(company_logo.read())
+        left_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = left_cell.paragraphs[0].add_run()
+        run.add_picture(tmp_logo2.name, width=Cm(6))
 
-    # Left Logo
-    left_cell = final_table.cell(0, 0)
-    for _ in range(10):
-        left_cell.add_paragraph()
-    left_cell.paragraphs[-1].add_run().add_picture(logo_path, width=Cm(6))
-
-    # Right Text + GHG Logo
-    right_cell = final_table.cell(0, 1)
+    # Right: date and GHG logo
     right_para = right_cell.paragraphs[0]
-    right_para.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
-    today = datetime.today().strftime("%d/%m/%Y")
-    right_para.add_run(f"Avanca, {today}\n\n").bold = True
+    right_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = right_para.add_run(f"Lisboa, {date.today().strftime('%d/%m/%Y')}\nGHG savings certified by:\n")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_ghg2:
+        tmp_ghg2.write(ghg_logo.read())
+        right_para.add_run().add_picture(tmp_ghg2.name, width=Cm(3.5))
 
-    right_cell.add_paragraph().add_run(
-        "Escritórios/Centro Logístico e Operacional\n"
-        "Rua Padre António Maria Pinho, n.º 71\n"
-        "3860-130, Avanca - Estarreja | Portugal\n\n"
-        "🌐  www.carbon-foote.com    |    www.hardlevel.pt\n\n"
-    )
+    # Finalize
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as docx_file:
+        doc.save(docx_file.name)
+        docx_file.seek(0)
+        st.success("✅ DOCX report ready!")
+        st.download_button("⬇️ Download Word Report", docx_file, file_name="relatorio_oleoes.docx")
 
-    last_ghg = right_cell.add_paragraph()
-    last_ghg.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
-    last_ghg.add_run("GHG savings certified by:   ")
-    last_ghg.add_run().add_picture(ghg_path, width=Cm(2))
-
-    # --- SAVE & EXPORT ---
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp_docx:
-        docx_path = tmp_docx.name
-        document.save(docx_path)
-
-    if export_format == "DOCX":
-        with open(docx_path, "rb") as f:
-            st.success("✅ Relatório DOCX gerado com sucesso!")
-            st.download_button("⬇️ Download DOCX", f.read(), file_name="relatorio_oleoes.docx")
-
-    elif export_format == "PDF":
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            pdf_path = os.path.join(tmp_dir, "relatorio_oleoes.pdf")
-
-            if DOCX2PDF_AVAILABLE and platform.system() in ["Windows", "Darwin"]:
-                docx2pdf_convert(docx_path, pdf_path)
-            else:
-                st.warning("📌 PDF export requires `docx2pdf` on Windows/macOS or LibreOffice on Linux.")
-                st.stop()
-
-            with open(pdf_path, "rb") as f:
-                st.success("✅ Relatório PDF gerado com sucesso!")
-                st.download_button("⬇️ Download PDF", f.read(), file_name="relatorio_oleoes.pdf")
+        # Export to PDF
+        try:
+            pdf_path = docx_file.name.replace(".docx", ".pdf")
+            convert(docx_file.name, pdf_path)
+            with open(pdf_path, "rb") as pdf_file:
+                st.download_button("⬇️ Download PDF Report", pdf_file, file_name="relatorio_oleoes.pdf")
+        except Exception as e:
+            st.warning(f"⚠️ PDF export failed: {e}")
