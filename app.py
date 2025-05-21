@@ -30,27 +30,29 @@ if excel_file and images:
         image_map[img_id] = img
 
     # Build the report
-    for index, row in df.iterrows():
-        internal = str(row["ID"])        # Match column name in your Excel
-        location = str(row["LOCAL"])     # Match column name in your Excel
+for index, row in df.iterrows():
+    internal = str(row["ID"])
+    location = str(row["LOCAL"])
 
-        document.add_paragraph(f"📌 Internal Number: {internal}")
+    document.add_paragraph(f"📌 Internal Number: {internal}")
 
-        if internal in image_map:
-            image_map[internal].seek(0)  # Reset pointer to start
-            image = Image.open(image_map[internal])
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-                image.save(tmp.name)
-                document.add_picture(tmp.name, width=Inches(4))
-        else:
-            document.add_paragraph("❌ Photo not found.")
+    if internal in image_map:
+        image_map[internal].seek(0)
+        image = Image.open(image_map[internal])
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+            image.save(tmp.name)
+            document.add_picture(tmp.name, width=Inches(4))
+    else:
+        document.add_paragraph("❌ Photo not found.")
 
-        document.add_paragraph(f"📍 Location: {location}")
-        document.add_page_break()
+    document.add_paragraph(f"📍 Location: {location}")
+    document.add_page_break()
 
-    # Save the Word doc to a temp file and offer download
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
-        document.save(tmp.name)
-        tmp.seek(0)
-        st.success("✅ Report generated successfully!")
-        st.download_button("⬇️ Download Report", tmp, file_name="photo_report.docx")
+# Save doc to bytes buffer for download
+import io
+docx_buffer = io.BytesIO()
+document.save(docx_buffer)
+docx_buffer.seek(0)
+
+st.success("✅ Report generated successfully!")
+st.download_button("⬇️ Download Report", docx_buffer, file_name="photo_report.docx")
