@@ -1,5 +1,5 @@
 streamlit
 pandas
-openpyxl
 python-docx
-pillow
+Pillow
+docx2pdf
