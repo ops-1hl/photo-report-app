@@ -81,14 +81,17 @@ if excel_file and photos and company_logo and ghg_logo:
         doc.add_paragraph(f"📌 CÓDIGO DO OLEÃO: {internal}", style="Normal")
 
         if internal in photo_map:
-            try:
-                img = Image.open(photo_map[internal]).convert("RGB")  # Ensure RGB
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as img_tmp:
-                    resized = img.resize((int(472.44), int(629.92)))  # ≈ 12cm x 16cm at 96 DPI
-                    resized.save(img_tmp.name, format="JPEG")
-                    doc.add_picture(img_tmp.name, width=Cm(12), height=Cm(16))
-            except Exception as e:
-                doc.add_paragraph("⚠️ Error loading image.")
+    try:
+        img_file = photo_map[internal]
+        img = Image.open(img_file).convert("RGB")  # Ensure RGB
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as img_tmp:
+            resized = img.resize((int(472.44), int(629.92)))  # ≈ 12cm x 16cm at 96 DPI
+            resized.save(img_tmp.name, format="JPEG")
+            doc.add_picture(img_tmp.name, width=Cm(12), height=Cm(16))
+    except Exception as e:
+        st.error(f"⚠️ Failed to add image for '{internal}': {e}")
+        doc.add_paragraph("⚠️ Error loading image.")
+
 
         else:
             doc.add_paragraph("❌ Photo not found.")
