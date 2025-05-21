@@ -27,21 +27,22 @@ if excel_file and images:
         image_map[img_id] = img
 
     for index, row in df.iterrows():
-        internal = str(row["InternalNumber"])
-        location = str(row["Location"])
+    internal = str(row["ID"])           # Fixed
+    location = str(row["LOCAL"])        # Fixed
 
-        document.add_paragraph(f"📌 Internal Number: {internal}")
+    document.add_paragraph(f"📌 Internal Number: {internal}")
 
-        if internal in image_map:
-            image = Image.open(image_map[internal])
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-                image.save(tmp.name)
-                document.add_picture(tmp.name, width=Inches(4))
-        else:
-            document.add_paragraph("❌ Photo not found.")
+    if internal in image_map:
+        image = Image.open(image_map[internal])
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+            image.save(tmp.name)
+            document.add_picture(tmp.name, width=Inches(4))
+    else:
+        document.add_paragraph("❌ Photo not found.")
 
-        document.add_paragraph(f"📍 Location: {location}")
-        document.add_page_break()
+    document.add_paragraph(f"📍 Location: {location}")
+    document.add_page_break()
+
 
     # Save to a temporary file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
