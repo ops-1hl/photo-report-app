@@ -132,10 +132,12 @@ if excel_file and images and logo_file and ghg_logo_file:
     row.cells[1].paragraphs[0].add_run().add_picture(tmp_ghg.name, width=Cm(3))
 
     # Export DOCX
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp_docx:
-        document.save(tmp_docx.name)
-        tmp_docx.seek(0)
-        st.download_button("⬇️ Baixar relatório DOCX", tmp_docx, file_name="relatorio_oleoes.docx")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
+    document.save(tmp.name)
+    with open(tmp.name, "rb") as f:
+        docx_data = f.read()
+    st.download_button("⬇️ Download Report", docx_data, file_name="photo_report.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+
 
     # Option to export as PDF
     if st.button("💾 Exportar como PDF (apenas local)"):
