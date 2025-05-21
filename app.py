@@ -9,6 +9,7 @@ import tempfile
 import io
 import os
 
+st.set_page_config(layout="wide")
 st.title("📸 Photo Report Generator")
 
 # Uploads
@@ -44,7 +45,7 @@ if logo_file and cert_logo_file and excel_file and images:
             table.columns[1].width = Inches(6)
             row_cells = table.rows[0].cells
 
-            # Left: logo (PNG preserved)
+            # Left: logo
             with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_logo:
                 img = Image.open(logo_file)
                 if img.mode in ("RGBA", "P"):
@@ -52,7 +53,7 @@ if logo_file and cert_logo_file and excel_file and images:
                 img.save(tmp_logo.name, format="PNG")
                 row_cells[0].paragraphs[0].add_run().add_picture(tmp_logo.name, width=Inches(3))
 
-            # Right: title text
+            # Right: text
             paragraph = row_cells[1].paragraphs[0]
             paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
             paragraph.add_run("\n\nMunicípio de Lisboa\n").bold = True
@@ -60,9 +61,8 @@ if logo_file and cert_logo_file and excel_file and images:
             paragraph.add_run("Relatório Final de Instalações\n").font.size = Pt(18)
             paragraph.add_run("\nAlargamento Rede de Oleões 2025").font.size = Pt(16)
 
-            # Spacer and bottom-right logo
+            # Bottom-right certifier logo
             document.add_paragraph("\n" * 10)
-
             cert_paragraph = document.add_paragraph()
             cert_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
             run = cert_paragraph.add_run("GHG savings certified by:  ")
@@ -77,31 +77,35 @@ if logo_file and cert_logo_file and excel_file and images:
 
             document.add_page_break()
 
-            # === REPORT PAGES ===
+            # === CONTENT PAGES ===
             image_map = {os.path.splitext(img.name)[0]: img for img in images}
 
             for index, row in df.iterrows():
-                internal = str(row["ID"])
+                codigo = str(row["ID"])  # "CÓDIGO DO OLEÃO"
 
-                # Use table layout for side-by-side or vertically structured content
-                doc_paragraph = document.add_paragraph()
-                doc_paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                doc_paragraph.add_run(f"📌 Internal Number: {internal}").bold = True
+                # Title on page
+                code_paragraph = document.add_paragraph()
+                code_paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                run = code_paragraph.add_run(f"📌 CÓDIGO DO OLEÃO: {codigo}")
+                run.bold = True
+                run.font.size = Pt(16)
 
-                if internal in image_map:
-                    image = Image.open(image_map[internal])
+                if codigo in image_map:
+                    image = Image.open(image_map[codigo])
                     if image.mode in ("RGBA", "P"):
                         image = image.convert("RGB")
 
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                         image.save(tmp.name, format="JPEG")
-                        document.add_picture(tmp.name, width=Inches(6))
+
+                        # Resize to fit page width (leave margin for text)
+                        document.add_picture(tmp.name, width=Inches(5.5))
                 else:
                     document.add_paragraph("❌ Photo not found.")
 
                 document.add_page_break()
 
-            # Save document to buffer and provide download
+            # Save and provide download
             docx_buffer = io.BytesIO()
             document.save(docx_buffer)
             docx_buffer.seek(0)
