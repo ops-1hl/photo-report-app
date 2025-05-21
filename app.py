@@ -8,7 +8,7 @@ import tempfile
 import io
 import os
 
-st.title("📸 Photo Location Report Generator")
+st.title("📸 Photo Report Generator")
 
 # Upload Excel file
 excel_file = st.file_uploader("Upload Excel file (.xlsx)", type=["xlsx"])
@@ -20,14 +20,12 @@ if excel_file and images:
     try:
         df = pd.read_excel(excel_file)
 
-        # Show columns to help debugging
-        st.write("📄 Columns found in Excel:", df.columns.tolist())
+        # Show columns for debugging
+        st.write("📄 Columns in Excel:", df.columns.tolist())
 
-        # Check for required columns
-        if "ID" not in df.columns or "LOCAL" not in df.columns:
-            st.error("❌ Excel must contain 'ID' and 'LOCAL' columns.")
+        if "ID" not in df.columns:
+            st.error("❌ Excel must contain an 'ID' column.")
         else:
-            # Create Word document
             document = Document()
 
             # Set to landscape mode
@@ -47,7 +45,6 @@ if excel_file and images:
 
             for index, row in df.iterrows():
                 internal = str(row["ID"])
-                location = str(row["LOCAL"])
 
                 document.add_paragraph(f"📌 Internal Number: {internal}", style='Heading2')
 
@@ -56,11 +53,11 @@ if excel_file and images:
                     image = Image.open(image_map[internal])
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                         image.save(tmp.name)
+                        # Resize image to fit landscape width
                         document.add_picture(tmp.name, width=Inches(6))
                 else:
                     document.add_paragraph("❌ Photo not found.")
 
-                document.add_paragraph(f"📍 Location: {location}")
                 document.add_page_break()
 
             # Save to in-memory buffer for download
