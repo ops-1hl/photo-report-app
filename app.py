@@ -37,6 +37,7 @@ if excel_file and images:
         document.add_paragraph(f"📌 Internal Number: {internal}")
 
         if internal in image_map:
+            image_map[internal].seek(0)  # Reset pointer to start
             image = Image.open(image_map[internal])
             with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                 image.save(tmp.name)
