@@ -5,6 +5,7 @@ from docx import Document
 from docx.shared import Inches, Cm
 from docx.enum.section import WD_ORIENT
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from docx.shared import Pt
 import tempfile
 import os
 import datetime
