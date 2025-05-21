@@ -11,7 +11,7 @@ import os
 
 st.title("📸 Photo Report Generator")
 
-# Upload files
+# Uploads
 logo_file = st.file_uploader("Upload company logo (left side of cover)", type=["jpg", "jpeg", "png"])
 cert_logo_file = st.file_uploader("Upload GHG certifier logo (bottom right of cover)", type=["jpg", "jpeg", "png"])
 excel_file = st.file_uploader("Upload Excel file (.xlsx)", type=["xlsx"])
@@ -27,7 +27,7 @@ if logo_file and cert_logo_file and excel_file and images:
         else:
             document = Document()
 
-            # Landscape orientation
+            # Set landscape orientation
             section = document.sections[0]
             section.orientation = WD_ORIENT.LANDSCAPE
             section.page_width, section.page_height = section.page_height, section.page_width
@@ -39,21 +39,23 @@ if logo_file and cert_logo_file and excel_file and images:
             # === COVER PAGE ===
             table = document.add_table(rows=1, cols=2)
             table.autofit = False
-            table.allow_autofit = False
             table.columns[0].width = Inches(4)
             table.columns[1].width = Inches(6)
 
             row_cells = table.rows[0].cells
 
-            # Left: Main company logo
+            # Left cell: company logo
             with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_logo:
                 img = Image.open(logo_file)
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
                 img.save(tmp_logo.name)
                 row_cells[0].paragraphs[0].add_run().add_picture(tmp_logo.name, width=Inches(3))
 
-            # Right: Title text, vertically centered
+            # Right cell: title text
             paragraph = row_cells[1].paragraphs[0]
             paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
             run = paragraph.add_run("\n\nMunicípio de Lisboa\n")
             run.bold = True
             run.font.size = Pt(24)
@@ -64,10 +66,10 @@ if logo_file and cert_logo_file and excel_file and images:
             run = paragraph.add_run("\nAlargamento Rede de Oleões 2025")
             run.font.size = Pt(16)
 
-            # Add some space before bottom-right corner
+            # Spacer for bottom content
             document.add_paragraph("\n" * 10)
 
-            # Bottom-right corner: certification text + logo
+            # Bottom-right: GHG certifier
             cert_paragraph = document.add_paragraph()
             cert_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
             run = cert_paragraph.add_run("GHG savings certified by:  ")
@@ -75,16 +77,17 @@ if logo_file and cert_logo_file and excel_file and images:
 
             with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_cert_logo:
                 cert_img = Image.open(cert_logo_file)
+                if cert_img.mode in ("RGBA", "P"):
+                    cert_img = cert_img.convert("RGB")
                 cert_img.save(tmp_cert_logo.name)
                 run.add_picture(tmp_cert_logo.name, width=Inches(1))
 
-            # Page break
+            # Page break after cover
             document.add_page_break()
 
-            # === IMAGE PAGES ===
+            # === REPORT PAGES ===
             image_map = {
-                os.path.splitext(img.name)[0]: img
-                for img in images
+                os.path.splitext(img.name)[0]: img for img in images
             }
 
             for index, row in df.iterrows():
@@ -92,8 +95,10 @@ if logo_file and cert_logo_file and excel_file and images:
                 document.add_paragraph(f"📌 Internal Number: {internal}", style='Heading2')
 
                 if internal in image_map:
-                    image_map[internal].seek(0)
                     image = Image.open(image_map[internal])
+                    if image.mode in ("RGBA", "P"):
+                        image = image.convert("RGB")
+
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                         image.save(tmp.name)
                         document.add_picture(tmp.name, width=Inches(6))
@@ -102,7 +107,7 @@ if logo_file and cert_logo_file and excel_file and images:
 
                 document.add_page_break()
 
-            # Save and provide download
+            # Save document to buffer and provide download
             docx_buffer = io.BytesIO()
             document.save(docx_buffer)
             docx_buffer.seek(0)
