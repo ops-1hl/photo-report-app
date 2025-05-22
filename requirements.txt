@@ -3,3 +3,5 @@ pandas
 python-docx
 Pillow
 docx2pdf
+openpyxl
+
